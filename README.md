@@ -1,6 +1,6 @@
 This readme file was generated on 2023-02-26 by Regina Bispo.
 
-The repository UrbanFiresData contains R notebooks written to support the data descripror 
+The repository UrbanFiresData contains RMarkdown files written to support the data descriptor 
 Bispo et al. (2023) A decade of urban fires: Portuguese events between 2012 and 2022. 
 The main goal is to present the source code (.Rmd files) behind the study. 
 
