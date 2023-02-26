@@ -25,8 +25,6 @@ This is an R notebook written to support the paper _Bispo et al. (2023) A decade
 
 This work is funded by national funds through the FCT - Fundação para a Ciência e a Tecnologia, I.P., under the scope of the project DSAIPA/DS/0088/2019 and research and development units UNIDEMI (project UIDB/00667/2020) and NOVAMATH (projects UIDB/00297/2020 and UIDP/00297/2020).
 
-![](novamath.png){width=42%}![](unidemi.png){width=13%}![](novaid.png){width=31%}![](fct.jpg){width=14%}
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   tidy = TRUE,
