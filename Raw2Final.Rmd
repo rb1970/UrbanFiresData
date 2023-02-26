@@ -1,0 +1,802 @@
+---
+title: "Portuguese urban fires between 2013 and 2022"
+author: "Regina Bispo"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true # table of content true
+    toc_depth: 3  # upto three depths of headings (specified by #, ## and ###)
+    number_sections: true  ## if you want number sections at each table header
+  pdf_document:
+    toc: true # table of content true
+    toc_depth: 3  # upto three depths of headings (specified by #, ## and ###)      
+    number_sections: true  ## if you want number sections at each table header
+---
+
+\newpage
+
+# Welcome
+
+__Whether we remain the ash or become the phoenix is up to us__  
+__Ming-Dao Deng__
+
+
+This is an R notebook written to support the paper _Bispo et al. (2023) A decade of urban fires: Portuguese events between 2012 and 2022_. The main goal is to present the source code (.md file) behind the study. 
+
+This work is funded by national funds through the FCT - Fundação para a Ciência e a Tecnologia, I.P., under the scope of the project DSAIPA/DS/0088/2019 and research and development units UNIDEMI (project UIDB/00667/2020) and NOVAMATH (projects UIDB/00297/2020 and UIDP/00297/2020).
+
+![](novamath.png){width=42%}![](unidemi.png){width=13%}![](novaid.png){width=31%}![](fct.jpg){width=14%}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  tidy = TRUE,
+	eval = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	comment = " ",
+	include = TRUE
+)
+
+library(ggplot2)
+library(dplyr)
+library(maps)
+library(dbscan)
+library(factoextra)
+library(RgoogleMaps)
+library(maps) 
+library(mapdata) 
+library(rgdal)
+library(viridis)
+library(RColorBrewer)
+library(tidygeocoder)
+library(dplyr)
+library(raster)
+library(tmap)
+library(rgeos)
+library(sf)
+library(spatstat)
+library(geosphere)
+library(readxl)
+library(googleway)
+library(deldir)
+library(OpenStreetMap)
+library(hms)
+library(janitor)
+library(stringr)
+library(stringi)
+library(here)
+library(stargazer)
+library(writexl)
+library(formatR)
+library(xlsx)
+library(knitr)
+library(lubridate)
+library(validate)
+```
+
+
+## Functions
+
+This code chunk imports the functions defined in the R script _SourceFunctions.R_:
+
+```{r}
+source("SourceFunctions.R")
+```
+
+Session info:
+
+```{r}
+cat(paste("#",capture.output(sessionInfo()), "\n", collapse =""))
+```
+
+
+# Reading files
+
+## Shapefiles
+
+This code chunk reads all the required shapefiles:
+
+```{r}
+# Districts
+dist=shapefile("shapefiles/distr/distritos.shp")
+# Municipalities
+conc=shapefile("shapefiles/conc/concelhos.shp")
+# Parishes
+freg=shapefile("shapefiles/freg/freguesias.shp")
+```
+
+
+
+## Data file
+
+This code chunk reads the raw data file:
+
+```{r}
+rawfiles<-list.files(here("raw data"),pattern = "xlsx",recursive = FALSE)
+assign("raw", read_xlsx(here("raw data",paste(rawfiles)), skip = 1))
+```
+
+```{r,include=FALSE}
+dim(raw)
+```
+
+Raw dataset has `r nrow(raw)` objects and `r ncol(raw)` variables. To make the data suitable for analytic purposes, several pre-processing actions were taken, including _data transformation_ and _data cleaning_. 
+
+
+# Data transformation
+
+## Shapefiles
+
+The next chunks transform to factor all shapefiles features, after converting the encoding of all variables as character vectors. It also excludes the islands of Madeira and Azores, keeping only the geometry data for mainland Portugal:
+
+```{r}
+# Districts
+dist$ID_0 <- as.factor(iconv(as.character(dist$ID_0), "UTF-8"))
+dist$ISO <- as.factor(iconv(as.character(dist$ISO), "UTF-8"))
+dist$NAME_0 <- as.factor(iconv(as.character(dist$NAME_0), "UTF-8"))
+dist$ID_1 <- as.factor(iconv(as.character(dist$ID_1), "UTF-8"))
+dist$NAME_1 <- as.factor(iconv(as.character(dist$NAME_1), "UTF-8"))
+dist$HASC_1 <- as.factor(iconv(as.character(dist$HASC_1),  "UTF-8"))
+dist$CCN_1<- as.factor(iconv(as.character(dist$CCN_1),  "UTF-8"))
+dist$CCA_1 <- as.factor(iconv(as.character(dist$CCA_1), "UTF-8"))
+dist$TYPE_1 <- as.factor(iconv(as.character(dist$TYPE_1), "UTF-8"))
+dist$ENGTYPE_1 <- as.factor(iconv(as.character(dist$ENGTYPE_1), "UTF-8"))
+dist$NL_NAME_1 <- as.factor(iconv(as.character(dist$NL_NAME_1), "UTF-8"))
+dist$VARNAME_1 <- as.factor(iconv(as.character(dist$VARNAME_1), "UTF-8"))
+dist=dist[dist$NAME_1!="Açores",]
+dist=dist[dist$NAME_1!="Madeira",]
+dist$NAME_1<-as.factor(droplevels(dist$NAME_1))
+
+
+# Municipalities
+conc$ID_0 <- as.factor(iconv(as.character(conc$ID_0),  "UTF-8"))
+conc$ISO <- as.factor(iconv(as.character(conc$ISO), "UTF-8"))
+conc$NAME_0 <- as.factor(iconv(as.character(conc$NAME_0), "UTF-8"))
+conc$NAME_1 <- as.factor(iconv(as.character(conc$NAME_1), "UTF-8"))
+conc$ID_2 <- as.factor(iconv(as.character(conc$ID_2), "UTF-8"))
+conc$NAME_2 <- as.factor(iconv(as.character(conc$NAME_2), "UTF-8"))
+conc$HASC_2 <- as.factor(iconv(as.character(conc$HASC_2),  "UTF-8"))
+conc$CCN_2 <- as.factor(iconv(as.character(conc$CCN_2),  "UTF-8"))
+conc$CCA_2 <- as.factor(iconv(as.character(conc$CCA_2),  "UTF-8"))
+conc$TYPE_2 <- as.factor(iconv(as.character(conc$TYPE_2),"UTF-8"))
+conc$ENGTYPE_2 <- as.factor(iconv(as.character(conc$ENGTYPE_2), "UTF-8"))
+conc$NL_NAME_2 <- as.factor(iconv(as.character(conc$NL_NAME_2), "UTF-8"))
+conc$VARNAME_2 <- as.factor(iconv(as.character(conc$VARNAME_2), "UTF-8"))
+conc=conc[conc$NAME_1!="Azores",]
+conc=conc[conc$NAME_1!="Madeira",]
+conc$NAME_1<-as.factor(droplevels(conc$NAME_1))
+conc$NAME_2<-as.factor(droplevels(conc$NAME_2))
+
+
+# Parishes
+freg$NAME_1 <- as.factor(iconv(as.character(freg$NAME_1), "UTF-8"))
+freg$NAME_2 <- as.factor(iconv(as.character(freg$NAME_2), "UTF-8"))
+freg$NAME_3 <- as.factor(iconv(as.character(freg$NAME_3), "UTF-8"))
+freg=freg[freg$NAME_1!="Azores",]
+freg=freg[freg$NAME_1!="Madeira",]
+freg$NAME_1<-as.factor(droplevels(freg$NAME_1))
+freg$NAME_2<-as.factor(droplevels(freg$NAME_2))
+freg$NAME_3<-as.factor(droplevels(freg$NAME_3))
+```
+
+
+
+
+## Data file
+
+```{r,include=FALSE}
+n0=dim(raw);n0
+```
+
+At this step, the dataset included `r n0[1]` objects and `r n0[2]` variables.
+
+
+The next chunks implement the following transformations:
+
++ __Remove emply columns and rows__ (if any) and __Rename appropriately the variables__ using content related strings:
+
+```{r}
+data<-remove_empty(raw,which = c("rows","cols"))
+
+names(data)=c("id","state","importance","open","close","length","code","family","species","type","region","subregion","district","municipality","parish","locality","lat","lon","codefd","pfd","groundhr","groundtr","airhr","airtr","deaths","major","minor","assist","other","apc","otherv","reignit","period","observations")
+```
+
+
+```{r,include=FALSE}
+n1=dim(data);n1
+```
+
+
++ __Delete features with constant values__:
+
+```{r}
+data$state<-NULL
+data$family<-NULL
+data$species<-NULL
+```
+
++ __Delete features with no consistent or incomplete information__:
+
+```{r}
+data$locality<-NULL
+data$observations<-NULL
+```
+
++ __Delete redundant features__:
+
+```{r}
+data$code<-NULL
+data$codefd<-NULL
+data$period<-NULL
+```
+
+
+
++ __Write consistently all names__, using lowercase letters, followed by capitalisation, both in the dataset and shapefiles:
+
+```{r}
+#data
+data$region<-factor(stringr::str_to_title(data$region))
+data$subregion<-factor(stringr::str_to_title(data$subregion))
+data$district<-factor(stringr::str_to_title(data$district))
+data$municipality<-factor(stringr::str_to_title(data$municipality))
+data$parish<-factor(stringr::str_to_title(data$parish))
+
+#shapefiles
+dist$NAME_1<-stringr::str_to_title(dist$NAME_1)
+conc$NAME_2<-stringr::str_to_title(conc$NAME_2)
+freg$NAME_1<-stringr::str_to_title(freg$NAME_1)
+freg$NAME_2<-stringr::str_to_title(freg$NAME_2)
+freg$NAME_3<-stringr::str_to_title(freg$NAME_3)
+```
+
++ Fire Departments __recoding__:
+
+```{r}
+data <- data %>% mutate(pfd = ifelse(data$pfd=="NULL","Unknown",data$pfd))
+```
+
+
++ __Translation to English__ (labels of all factors, except features defining the administrative units): 
+
+```{r}
+data <- data %>% mutate(importance = recode(importance,
+  "Auto - Interface" = "unknown",
+  "Elevada" = "high",
+  "Moderada" = "medium",
+  "Reduzida" = "low"))
+
+data <- data %>% mutate(reignit = recode(reignit,
+  "Não" = "no",
+  "Sim" = "yes"))
+
+
+data <- data %>% mutate(type = recode(type,
+                                      "2117 - Áreas Comerciais e Gares de Transportes" = "Commercial areas and Transport stations",
+                                      "2123 - Bibliotecas e Arquivos" = "Libraries and Archives",
+                                      "2119 - Desporto e Lazer" = "Sports and Leisure centers",
+                                      "2129 - Edifícios degradados ou devolutos" = "Degraded or unoccupied buildings",
+                                      "2113 - Espectáculos e Reuniões Públicas" = "Shows and Public meetings",
+                                      "2103 - Estacionamento de superfície" = "Above surface parking",
+                                      "2105 - Estacionamento em profundidade ou silo" = "Undergroung parking",
+                                      "2101 - Habitacional" = "Residential",
+                                      "2111 - Hospitalares e Lares de Idosos" = "Hospitals and Nursing homes",
+                                      "2115 - Hotelaria e Restauração" = "Hotels and Restaurants",
+                                      "2127 - Indústria, Oficina e Armazém" = "Industry, Workshops and Warehouses",
+                                      "2125 - Militar, Forças de Segurança e Forças de Socorro" = "Military, security and emergency forces",
+                                      "2121 - Museus e Galerias de Arte" = "Museums and Art galleries",
+                                      "2109 - Parque Escolar" = "School campus",
+                                      "2107 - Serviços Administrativos" = "Administrative services"))
+```
+
+
++ __Convert the variables class__
+
+```{r}
+chr2fac<-colnames(select_if(data, is.character))
+data[,chr2fac] <- lapply(data[,chr2fac],factor)
+```
+
+
+```{r,include=FALSE}
+n2=dim(data);n2
+```
+
+At this step, the dataset included `r n2[1]` objects and `r n2[2]` variables.
+
+# Structural validation 1
+
+The following chunk defines the code lists that are used to validate the respective categorical variables:
+
+```{r}
+structure.list=c("Commercial areas and Transport stations","Libraries and Archives","Sports and Leisure centers","Degraded or unoccupied buildings","Shows and Public meetings","Above surface parking","Undergroung parking","Residential","Hospitals and Nursing homes","Hotels and Restaurants","Industry, Workshops and Warehouses","Military, security and emergency forces","Museums and Art galleries","School campus","Administrative services")
+
+region.list<-c("Alentejo","Algarve","Centro","Lisboa E Vale Do Tejo","Norte")
+  
+subregion.list<-c("Alentejo Central","Alentejo Litoral","Algarve","Alto Alentejo","Alto Minho","Alto Tâmega E Barroso","Area M. Lisboa","Area M. Porto","Ave","Baixo Alentejo","Beira Baixa","Beiras E Serra Da Estrela","Cávado","Douro","Lezíria Do Tejo","Médio Tejo",                "Oeste","Região De Aveiro","Região De Coimbra","Região De Leiria","Tâmega E Sousa","Terras De Trás-Os-Montes","Viseu Dão Lafões")
+
+dist.list<-as.character(sort(unique(data$district)))
+
+mun.list<-as.character(sort(unique(data$municipality)))
+
+par.list<-as.character(sort(unique(data$parish)))
+```
+
+The next chunk implements and check the initial validation rules:
+
+```{r}
+rules <- validator(
+  rule.id.1=is.numeric(data$id),
+  rule.id.2=is_unique(data$id),
+  rule.importance.1=is.factor(data$importance),
+  rule.importance.2=data$importance %in% c("low","medium","high","unknown"),
+  rule.importance.3= with(data,(deaths==0 & (major+minor)<5 & length<30))==(data$importance=="low"),
+  rule.importance.4= with(data,deaths==0 & (major+minor)<10 & length>=30 & length<60)==(data$importance=="medium"),
+  rule.importance.5= with(data,deaths>=1 | (major+minor)>=10 | length>=60)==(data$importance=="high"),
+  rule.open.1=is.POSIXct(data$open),
+  rule.open.2=in_range(data$open,min="2013-01-01 00:00:00",max="2022-12-31 23:59:00"),
+  rule.close.1=is.POSIXct(data$close),
+  rule.close.2=in_range(data$close,min="2013-01-01 00:00:00",max="2023-01-01 23:59:00"),
+  rule.close.3=data$close > data$open,
+  rule.length.1=is.numeric(data$length),
+  rule.length.2=data$length>0,
+  rule.length.3=data$length == difftime(data$close,data$open,units = "mins"),
+  rule.type.1=is.factor(data$type),
+  rule.type.2=length(levels(data$type))==length(structure.list),
+  rule.type.3=data$type %in% structure.list,
+  rule.region.1=is.factor(data$region),
+  rule.region.2=length(levels(data$region))<=length(region.list),
+  rule.region.3=data$region %in% region.list,
+  rule.subregion.1=is.factor(data$subregion),
+  rule.subregion.2=length(levels(data$subregion))<=length(subregion.list),
+  rule.subregion.3=data$subregion %in% subregion.list,
+  rule.district.1=is.factor(data$district),
+  rule.district.2=length(levels(data$district)) <= length(levels(as.factor(dist$NAME_1))),
+  rule.district.3=data$district %in% levels(as.factor(dist$NAME_1)),
+  rule.district.4=
+listunmatch(dist.list,matchdist)==0,
+  rule.municipality.1=is.factor(data$municipality),
+  rule.municipality.2=length(levels(data$municipality)) <= length(levels(as.factor(conc$NAME_2))),  
+  rule.municipality.3=data$municipality %in% levels(as.factor(conc$NAME_2)),  
+  rule.municipality.4=listunmatch(mun.list,matchmun)==0,
+  rule.parish.1=is.factor(data$parish),
+  rule.parish.2=length(levels(data$parish)) <= length(levels(as.factor(freg$NAME_3))),
+  rule.parish.3=data$parish %in% levels(as.factor(freg$NAME_3)),
+  rule.parish.4=listunmatch(par.list,matchpar)==0,
+  rule.lat.1=is.numeric(data$lat),
+  rule.lat.2=in_range(data$lat, min=dist@bbox[2,1], max=dist@bbox[2,2]),
+  rule.lon.1=is.numeric(data$lon),
+  rule.lon.2=in_range(data$lon, min=dist@bbox[1,1], max=dist@bbox[1,2]),
+  rule.pfd.1=is.factor(data$pfd),
+  rule.groundhr.1=is.numeric(data$groundhr),
+  rule.groundhr.2=data$groundhr >= 0,
+  rule.groundtr.1=is.numeric(data$groundtr),
+  rule.groundtr.2=data$groundtr >= 0,
+  rule.airhr.1=is.numeric(data$airhr),
+  rule.airhr.2=data$airhr >= 0,
+  rule.airtr.1=is.numeric(data$airtr),
+  rule.airtr.2=airtr >= 0,
+  rule.deaths.1=is.numeric(data$deaths),
+  rule.deaths.2=data$deaths >= 0,
+  rule.major.1=is.numeric(data$major),
+  rule.major.2=data$major >= 0,
+  rule.minor.1=is.numeric(data$minor),
+  rule.minor.2=data$minor >= 0,
+  rule.assist.1=is.numeric(data$assist),
+  rule.assist.2=data$assist >= 0,
+  rule.other.1=is.numeric(data$other),
+  rule.other.2=data$other >= 0,
+  rule.apc.1=is.numeric(data$apc),
+  rule.apc.2=data$apc >= 0,
+  rule.otherv.1=is.numeric(data$otherv),
+  rule.otherv.2=data$otherv >= 0,
+  rule.reignit.1=is.factor(data$reignit),
+  rule.reignit.2=length(levels(data$reignit))==2,
+  rule.reignit.3=data$reignit %in% c("no","yes")
+)
+```
+
+Validation results:
+```{r}
+confront(data, rules)
+summary(confront(data, rules))[,-c(6:8)]
+```
+
+
+
+# Data cleaning
+
+## Variable length 
+
++ Replace length by the difference between variables close and open
+
+The next chunk checks fire length by comparing the given value with the difference between the ignition and the extinction date/times: 
+
+```{r}
+dur <- as.numeric()
+for (i in 1:nrow(data)) {
+  if (!is.na(data$length[i])) {
+    dur[i] <- difftime(data$close[i], data$open[i], units = c("mins"))
+  }
+}
+```
+Number of errors: `r sum(dur-data$length,na.rm=T)`.
+
+As the raw fire length was given rounded to the largest integer not greater than the corresponding value, it was replaced by the true time difference:
+
+```{r}
+data$length<-dur
+```
+
+Number of errors after correction: `r sum(dur-data$length,na.rm=T)`.
+
+
++ Remove events with negative length
+
+
+```{r}
+data = data %>%  filter(data$length>0)
+```
+
+```{r,include=FALSE}
+n3=dim(data);n3
+```
+
+At this step, the dataset included `r n3[1]` objects and `r n3[2]` variables.
+
+
+## Variable importance
+
+The next chunk correctes variable importance according to definitions:
+
+```{r}
+data = data %>%
+  mutate(importance=factor(ifelse(data$deaths==0 & (data$major+data$minor)<5 & data$length<30,"low",ifelse(data$deaths>=1|(data$major+data$minor)>=10 | data$length>=60,"high","medium"))))
+```
+
+## Variables lon and lat
+
+The next chunk limits observations to Portuguese borders:
+
+```{r}
+## Defining portuguese border
+bound=dist[dist$NAME_0=="Portugal",]
+
+## create spatial object from coordinates and data.frame
+spdf <- SpatialPointsDataFrame(coords = data[, c("lon", "lat")], data = data, proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
+
+data = data %>%  filter(!is.na(over(spdf, as(bound, "SpatialPolygons"))))
+```
+
+```{r,include=FALSE}
+n4=dim(data);n4
+```
+
+Number of objects outside borders: `r n3[1]-n4[1]`.
+
+At this step, the dataset included `r n4[1]` objects and `r n4[2]` variables.
+
+
+
+## Variables district, municipality and parish
+
+### Number of levels
+
+1. Comparing the number of district levels from the dataset with the number of official Portuguese districts:
+
+```{r}
+#Checking the number of district units
+ifelse(length(unique((data$district)))==length(unique((dist$NAME_1))),"Same number of district levels","Different number of district levels")
+```
+
+Labels inconsistency:
+```{r}
+udnames=NameUnmatch(dist,"district","NAME_1")
+```
+
+There are `r sum(!is.na(udnames$correct))` unmatching names.
+
+
+2. Comparing the number of municipality levels from the dataset with the number of official Portuguese municipalities:
+
+```{r}
+#Checking the number of municipality units
+ifelse(length(unique(data$municipality))==length(unique((conc$NAME_2))),"Same number of municipality levels","Different number of municipality levels")
+
+```
+
+
+Labels inconsistency:
+
+```{r}
+umnames=NameUnmatch(conc,"municipality","NAME_2");umnames
+```
+
+There are `r sum(!is.na(umnames$correct))` unmatching names.
+
+Correcting label error:
+
+```{r}
+levels(data$municipality)[levels(data$municipality)==umnames$incorrect]<-umnames$correct
+```
+
+
+### Levels' names
+
+#### Districts
+
+The next chunks identifies the spatial points with coordinates in- and outside the respective given distric name:
+
+```{r}
+namesd=sort(unique(data$district))
+listoutd<-list()
+for (i in 1:length(namesd)) {
+listoutd[[i]]=outlimitdist(namesd[i])
+}
+names(listoutd)<-namesd
+dfs<-Filter(is.data.frame, listoutd)
+df<-bind_rows(dfs)
+rownames(df)<-NULL
+df
+```
+
+Number of districts with points falling outside administrative boundaries: `r nrow(df)` districts, corresponding to `r round((nrow(df)/length(data$district))*100,4)` \%
+
+Mapping the errors:
+
+```{r}
+map=dist[dist$NAME_0=="Portugal",]
+
+tif_sf <- st_as_sf(df, coords = c("lon", "lat"), crs = 4326)
+tif_sf$new_dist_error=paste0("  ",rownames(tif_sf),".",tif_sf$dist_error)
+
+tmap_options(check.and.fix = TRUE)
+tm_shape(map) + 
+  tm_borders() +
+  tm_text("NAME_1",size = 0.5, fontfamily="sans", ymod = 0.4)+
+  tm_shape(tif_sf) + tm_dots(size=0.05,shape=4,col="red") +
+  tm_text("new_dist_error",size = 0.4,col="red",just="left") 
+```
+
+The next chunk corrects these errors:
+
+```{r}
+for (i in 1:length(dfs)) {
+df=dfs[[i]]
+spdf <- SpatialPointsDataFrame(coords = df[,c("lon", "lat")], data = df, proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
+newloc<-as.character(dist$NAME_1[over(spdf, as(dist, "SpatialPolygons"))])
+data[data$lon %in% df$lon & data$lat %in% df$lat,"district"]<-newloc
+}
+
+clistoutd<-list()
+for (i in 1:length(namesd)) {
+  clistoutd[[i]]=outlimitdist(namesd[i])
+  }
+```
+
+
+```{r,include=FALSE}
+n5=dim(data);n5
+```
+
+At this step, the dataset included `r n5[1]` objects and `r n5[2]` variables.
+
+
+```{r,fig.width=6,fig.height=2,include=FALSE,results='hide'}
+
+tif_sf$dist_error=paste(" ",tif_sf$dist_error)
+tif_sf$dist_true=paste(" ",tif_sf$dist_true)
+
+
+zoom_map=function(v){
+BP_region = st_as_sfc(st_bbox(c(xmin = v[1], xmax = v[2],
+                      ymin = v[3], ymax = v[4]),crs = 4326))
+plt1=tm_shape(map) + 
+     tm_borders()+
+   tm_text("NAME_1",size = 0.6, fontfamily="sans", ymod = 0.4)  + 
+   tm_shape(BP_region) + tm_borders(lwd = 2,col = "red") +
+  tm_shape(tif_sf)+ tm_dots(size=0.04,shape=4,col="red") +
+  tm_text("dist_error",size = 0.6,col="red",just="left") 
+
+plt2=tm_shape(map, bbox = BP_region) +
+    tm_borders() +
+   tm_text("NAME_1",size = 0.8, fontfamily="sans", ymod = 0.4)+
+  tm_shape(tif_sf) + tm_dots(size=0.04,shape=4,col="red") +
+  tm_text("dist_error",size = 1,col="red",just="left")  + 
+  tm_layout(main.title= '(A)', main.title.position = "center",main.title.size = 0.8)
+
+plt3=tm_shape(map, bbox = BP_region) +
+    tm_borders() +
+   tm_text("NAME_1",size = 0.8, fontfamily="sans", ymod = 0.4)+
+  tm_shape(tif_sf) + tm_dots(size=0.04,shape=4,col="red") +
+  tm_text("dist_true",size = 1,col="red",just="left")  + 
+  tm_layout(main.title= '(B)', main.title.position = "center",main.title.size = 0.8)
+return(tmap_arrange(plt1,plt2,plt3))
+}
+
+rzoom=data.frame(v1=c(-9,-7.9,40.9,42.1),
+                 v2=c(-8.8,-6.7,39.2,41.3),
+                 v3=c(-9.5,-8,38.5,39.5))
+
+for (i in 1:3) {
+pdf(paste0("../Scientific Data Journal/finalfigs/","dc",i,".pdf"),width = 10,height = 5)
+print(zoom_map(rzoom[,i]))
+dev.off()
+}
+
+
+```
+
+
+#### Municipalities
+
++ __Correct municipality names__
+
+The next chunks identifies the spatial points with coordinates in- and outside the respective given municipality name:
+
+```{r,include=FALSE}
+listoutm<-list()
+for (i in 1:length(unique(data$municipality))) {
+listoutm[[i]]=outlimitmun(unique(data$municipality)[i])
+}
+dfs_m<-listoutm[which(unlist(lapply(X = listoutm,FUN = is.data.frame)))]
+df_m<-bind_rows(dfs_m)
+rownames(df_m)<-NULL
+```
+
+Error example:
+
+```{r}
+df_m[df_m$mun_error=="Coimbra",]
+```
+
+Number of municipalities with points falling outside administrative boundaries: `r nrow(df_m)` errors, within `r length(dfs_m)` districts, corresponding to `r round(nrow(df_m)/nrow(data)*100,1)` \%
+
+The next chunk plots the municipalities with errors before correction:
+
+```{r,fig.width=8,fig.height=26}
+par(mfrow=c(12,6))
+par(oma=c(0,0,0,0))
+par(mar=c(0,0,2,0))
+for (i in 1:length(unique(df_m$mun_error))) {
+  testplot(dfs_m[[i]],unique(dfs_m[[i]]$mun_error))
+}
+```
+
+The next chunk corrects the errors:
+
+```{r}
+#points outside boundaries
+df<-data.frame(data[,c("municipality","lon","lat")])
+coordinates(df)=~lon+lat
+proj4string(df) = proj4string(conc)
+correctmun<-over(df, conc)
+
+#corection
+data$municipality<-factor(correctmun$NAME_2)
+
+```
+
+This chunk checks the correction:
+
+```{r,results="hide"}
+#points outside boundaries
+clistoutm<-list()
+for (i in 1:length(unique(data$municipality))) {#length=278 - certo
+clistoutm[[i]]=outlimitmun(unique(data$municipality)[i])
+}
+
+#extract dataframes with points outside boundaries
+correctedm=length(clistoutm[which(unlist(lapply(X = clistoutm,FUN = is.data.frame)))])
+```
+
+Number of municipalities with points falling outside administrative boundaries, after correction: `r correctedm` errors
+
+
+```{r,include=FALSE}
+n6=dim(data);n6
+```
+
+At this step, the dataset included `r n6[1]` objects and `r n6[2]` variables.
+
+#### Parishes
+
+Correcting parishes:
+
+```{r,results="hide"}
+#points outside boundaries
+clistoutp<-list()
+for (i in 1:length(unique(data$parish))) {
+clistoutp[[i]]=outlimitpar(unique(data$parish)[i])
+}
+
+#extract dataframes with points outside boundaries
+correctedp=length(clistoutp[which(unlist(lapply(X = clistoutp,FUN = is.data.frame)))])
+correctedp
+```
+
+Number of parishes with points falling outside administrative boundaries: `r correctedp` errors
+
+```{r,results="hide"}
+#points outside boundaries
+df_p<-data.frame(data[,c("parish","lon","lat")])
+coordinates(df_p)=~lon+lat
+proj4string(df_p) = proj4string(freg)
+correctpar<-over(df_p, freg)
+
+#correction
+data$parish<-factor(correctpar$NAME_3)
+
+#checking
+clistoutp_1<-list()
+for (i in 1:length(unique(data$parish))) {
+clistoutp_1[[i]]=outlimitpar(unique(data$parish)[i])
+}
+
+# extract dataframes with points outside boundaries
+correctedp_1=length(clistoutp_1[which(unlist(lapply(X = clistoutp_1,FUN = is.data.frame)))])
+```
+
+Number of parishes with points falling outside administrative boundaries, after correction: `r correctedp_1` errors
+
+
+```{r,include=FALSE}
+n7=dim(data);n7
+```
+
+At this step, the dataset included `r n7[1]` objects and `r n7[2]` variables.
+
+
+
+# Structural validation 2
+
+```{r}
+confront(data, rules)
+summary(confront(data, rules))[,-c(6:8)]
+```
+
+At this stage there were `r sum(apply(X = is.na(data), 1, sum))` missing values.
+
+```{r,include=FALSE}
+n8=dim(data);n8
+```
+
+The dataset included `r n8[1]` objects and `r n8[2]` variables.
+
+
+# Final dataset
+
+## Dataset size changes
+
+```{r}
+size=as.data.frame(rbind(n1,n2,n3,n4,n5,n6,n7,n8))
+
+  for (i in 2:nrow(size)) {
+    size$dif.cases[1]=size$V1[1]-size$V1[1]
+    size$dif.cases[i]=size$V1[i-1]-size$V1[i]
+    }
+
+  for (i in 2:nrow(size)) {
+    size$dif.vars[1]=size$V2[1]-size$V2[1]
+    size$dif.vars[i]=size$V2[i-1]-size$V2[i]
+    }
+
+rownames(size)=c("Start","Removal of variables","Negative length","Portuguese borders","District labels correction","Minicipality labels correction","Parish labels correction","Final")
+colnames(size)=c("n","p","delta.n","delta.p")
+
+size
+```
+
+## Summary
+
+```{r}
+str(data)
+summary(data)
+
+```
+
+## Save final data
+
+```{r}
+write_xlsx(data,col_names = TRUE,path = "finaldata.xlsx")
+```
