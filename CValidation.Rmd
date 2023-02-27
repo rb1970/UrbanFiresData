@@ -67,7 +67,7 @@ library(validate)
 library(gridExtra)
 
 
-load('Workspaces/Raw2FinalEnv.RData')
+load('Raw2FinalEnv.RData')
 ```
 
 # Data description
