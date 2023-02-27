@@ -794,6 +794,12 @@ summary(data)
 
 ```
 
+## Save workspace
+
+```{r}
+save.image("Raw2FinalEnv.RData")
+```
+
 ## Save final data
 
 ```{r}
