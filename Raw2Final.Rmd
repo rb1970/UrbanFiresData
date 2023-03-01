@@ -96,13 +96,10 @@ This code chunk reads all the required shapefiles:
 
 ```{r}
 # Districts
-unzip("shapefiles/dist/distritos.zip")
 dist=shapefile("shapefiles/dist/distritos.shp")
 # Municipalities
-unzip("shapefiles/conc/concelhos.zip")
 conc=shapefile("shapefiles/conc/concelhos.shp")
 # Parishes
-unzip("shapefiles/freg/freguesias.zip")
 freg=shapefile("shapefiles/freg/freguesias.shp")
 ```
 
@@ -113,8 +110,7 @@ freg=shapefile("shapefiles/freg/freguesias.shp")
 This code chunk reads the raw data file:
 
 ```{r}
-rawfiles<-list.files(here("raw data"),pattern = "xlsx",recursive = FALSE)
-assign("raw", read_xlsx(here("raw data",paste(rawfiles)), skip = 1))
+assign("raw", read_xlsx("rawdata.xlsx", skip = 1))
 ```
 
 ```{r,include=FALSE}
