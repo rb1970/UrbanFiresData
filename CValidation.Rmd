@@ -117,9 +117,7 @@ summary(data$length)
 
 
 ```{r,include=FALSE}
-# pdf("../Scientific Data Journal/finalfigs/length.pdf",width = 6,height = 5)
 hist(data$length,probability=T,main=" ",xlab="Length of urban fires (in minutes)")
-# dev.off()
 ```
 
 
@@ -364,9 +362,7 @@ p4=ggplot(tab4, aes(x,Proportion)) +
   geom_text(aes(label = paste0(sprintf("%4.1f", Proportion * 100), "%"),angle=90),cex=3,hjust=1.2) +
   theme_bw()+ ggtitle("(D)")
 
-pdf("../Scientific Data Journal/finalfigs/time.pdf",width = 9,height = 6)
 grid.arrange(p1,p2,p3,p4, nrow = 2)
-dev.off()
 ```
 
 ## Total counts per district
@@ -562,7 +558,6 @@ name=paste(unique(bubble$district)[i])
         tm_shape(bubble[bubble$district==name&bubble$year=="2013",])+ 
           tm_bubbles(size = "n", col="n",alpha=0.4, breaks=bks, legend.size.show = FALSE, title.col = "Frequency") + 
           tm_layout(main.title= " ", main.title.position = "center",main.title.size = 2,legend.text.size = 1, legend.title.size = 1.5,frame=FALSE))
-  dev.off()
 ```
 
 Variable distribution:
@@ -592,7 +587,6 @@ tab=data %>%
   mutate(prop=n/nrow(data)) %>% arrange(-prop)
 
 tab
-
 
 ggplot(tab, aes(y = reorder(district, prop),x=prop)) +
  geom_bar(stat="identity", position = position_stack(reverse = TRUE),fill="black",alpha=0.7) + ylab(" ") + xlab("Proportion") +
