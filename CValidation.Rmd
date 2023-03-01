@@ -13,9 +13,7 @@ output:
     number_sections: true
 ---
 
-Steps before running this file:
-1. Run Raw2Final.Rmd
-2. Save the workspace as Raw2FinalEnv.RData
+Run Raw2Final.Rmd before running this file.
 
 \newpage
 
