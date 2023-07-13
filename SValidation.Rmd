@@ -96,11 +96,14 @@ This code chunk reads all the required shapefiles:
 
 ```{r}
 # Districts
-dist=shapefile("shapefiles/dist/distritos.shp")
+unzip("shapefiles/dist/distritos.zip")
+dist<-shapefile("distritos.shp")
 # Municipalities
-conc=shapefile("shapefiles/conc/concelhos.shp")
+unzip("shapefiles/conc/concelhos.zip")
+conc<-shapefile("concelhos.shp")
 # Parishes
-freg=shapefile("shapefiles/freg/freguesias.shp")
+unzip("shapefiles/freg/freguesias.zip")
+freg<-shapefile("freguesias.shp")
 ```
 
 
