@@ -5,7 +5,7 @@ Bispo et al. (2023) A decade of urban fires: Portuguese events between 2013 and 
 The main goal is to present the source code (.Rmd files) behind the study. 
 
 It contains two .Rmd files: 
-(1) Raw2Final.Rmd - which includes the code from reading raw data till writing the final dataset, passing through data transforming, data cleaning and structural 
+(1) SValidation.Rmd - which includes the code for reading raw data and data transforming, data cleaning and structural 
 validation actions, and 
 (2) CValidation.Rmd - containing the code related to content validation procedures, which follow the actions taken on the former Rmd file.
 
