@@ -130,7 +130,7 @@ return(tab)
 
 # function to produce table with quantiles for quantitative variables
 qtab=function(var){
-tab=as.data.frame(quantile(unlist(data[,paste(var)]),c(seq(0,0.9,0.1),0.95,0.99)))
+tab=as.data.frame(quantile(unlist(data[,paste(var)]),c(seq(0,0.9,0.1),0.95,0.99),na.rm=T))
 colnames(tab)=c(stringr::str_to_title(paste(var)))
 return(tab)
 }
