@@ -301,7 +301,8 @@ n2=dim(data);n2
 
 At this step, the dataset included `r n2[1]` objects and `r n2[2]` variables.
 
-# Structural validation 1
+
+# Structural validation
 
 The following chunk defines the code lists that are used to validate the respective categorical variables:
 
@@ -312,96 +313,122 @@ region.list<-c("Alentejo","Algarve","Centro","Lisboa E Vale Do Tejo","Norte")
   
 subregion.list<-c("Alentejo Central","Alentejo Litoral","Algarve","Alto Alentejo","Alto Minho","Alto Tâmega E Barroso","Area M. Lisboa","Area M. Porto","Ave","Baixo Alentejo","Beira Baixa","Beiras E Serra Da Estrela","Cávado","Douro","Lezíria Do Tejo","Médio Tejo",                "Oeste","Região De Aveiro","Região De Coimbra","Região De Leiria","Tâmega E Sousa","Terras De Trás-Os-Montes","Viseu Dão Lafões")
 
+
+
 dist.list<-as.character(sort(unique(data$district)))
-
 mun.list<-as.character(sort(unique(data$municipality)))
-
 par.list<-as.character(sort(unique(data$parish)))
+
+
+# dist.list<-dist$NAME_1
+# mun.list<-conc$NAME_2
+# par.list<-freg$NAME_3
+
+
+# dist.list<-dist$Distrito
+# mun.list<-conc$Concelho
+# par.list<-freg$Freguesia
+
 ```
 
 The next chunk implements and check the initial validation rules:
 
 ```{r}
 rules <- validator(
-  rule.id.1=is.numeric(data$id),
-  rule.id.2=is_unique(data$id),
-  rule.importance.1=is.factor(data$importance),
-  rule.importance.2=data$importance %in% c("low","medium","high","unknown"),
-  rule.importance.3= with(data,(deaths==0 & (major+minor)<5 & length<30))==(data$importance=="low"),
-  rule.importance.4= with(data,deaths==0 & (major+minor)<10 & length>=30 & length<60)==(data$importance=="medium"),
-  rule.importance.5= with(data,deaths>=1 | (major+minor)>=10 | length>=60)==(data$importance=="high"),
-  rule.open.1=is.POSIXct(data$open),
-  rule.open.2=in_range(data$open,min="2013-01-01 00:00:00",max="2022-12-31 23:59:00"),
-  rule.close.1=is.POSIXct(data$close),
-  rule.close.2=in_range(data$close,min="2013-01-01 00:00:00",max="2023-01-01 23:59:00"),
-  rule.close.3=data$close > data$open,
-  rule.length.1=is.numeric(data$length),
-  rule.length.2=data$length>0,
-  rule.length.3=data$length == difftime(data$close,data$open,units = "mins"),
-  rule.type.1=is.factor(data$type),
-  rule.type.2=length(levels(data$type))==length(structure.list),
-  rule.type.3=data$type %in% structure.list,
-  rule.region.1=is.factor(data$region),
-  rule.region.2=length(levels(data$region))<=length(region.list),
-  rule.region.3=data$region %in% region.list,
-  rule.subregion.1=is.factor(data$subregion),
-  rule.subregion.2=length(levels(data$subregion))<=length(subregion.list),
-  rule.subregion.3=data$subregion %in% subregion.list,
-  rule.district.1=is.factor(data$district),
-  rule.district.2=length(levels(data$district)) <= length(levels(as.factor(dist$NAME_1))),
-  rule.district.3=data$district %in% levels(as.factor(dist$NAME_1)),
-  rule.district.4=
-listunmatch(dist.list,matchdist)==0,
-  rule.municipality.1=is.factor(data$municipality),
-  rule.municipality.2=length(levels(data$municipality)) <= length(levels(as.factor(conc$NAME_2))),  
-  rule.municipality.3=data$municipality %in% levels(as.factor(conc$NAME_2)),  
-  rule.municipality.4=listunmatch(mun.list,matchmun)==0,
-  rule.parish.1=is.factor(data$parish),
-  rule.parish.2=length(levels(data$parish)) <= length(levels(as.factor(freg$NAME_3))),
-  rule.parish.3=data$parish %in% levels(as.factor(freg$NAME_3)),
-  rule.parish.4=listunmatch(par.list,matchpar)==0,
-  rule.lat.1=is.numeric(data$lat),
-  rule.lat.2=in_range(data$lat, min=dist@bbox[2,1], max=dist@bbox[2,2]),
-  rule.lon.1=is.numeric(data$lon),
-  rule.lon.2=in_range(data$lon, min=dist@bbox[1,1], max=dist@bbox[1,2]),
-  rule.pfd.1=is.factor(data$pfd),
-  rule.groundhr.1=is.numeric(data$groundhr),
-  rule.groundhr.2=data$groundhr >= 0,
-  rule.groundtr.1=is.numeric(data$groundtr),
-  rule.groundtr.2=data$groundtr >= 0,
-  rule.airhr.1=is.numeric(data$airhr),
-  rule.airhr.2=data$airhr >= 0,
-  rule.airtr.1=is.numeric(data$airtr),
-  rule.airtr.2=airtr >= 0,
-  rule.deaths.1=is.numeric(data$deaths),
-  rule.deaths.2=data$deaths >= 0,
-  rule.major.1=is.numeric(data$major),
-  rule.major.2=data$major >= 0,
-  rule.minor.1=is.numeric(data$minor),
-  rule.minor.2=data$minor >= 0,
-  rule.assist.1=is.numeric(data$assist),
-  rule.assist.2=data$assist >= 0,
-  rule.other.1=is.numeric(data$other),
-  rule.other.2=data$other >= 0,
-  rule.apc.1=is.numeric(data$apc),
-  rule.apc.2=data$apc >= 0,
-  rule.otherv.1=is.numeric(data$otherv),
-  rule.otherv.2=data$otherv >= 0,
-  rule.reignit.1=is.factor(data$reignit),
-  rule.reignit.2=length(levels(data$reignit))==2,
-  rule.reignit.3=data$reignit %in% c("no","yes")
+  r1=is.numeric(data$id),
+  r2=is_unique(data$id),
+  r3=is.factor(data$importance),
+  r4=data$importance %in% c("low","medium","high","unknown"),
+  r5= data$importance[data$deaths==0 & (data$major+data$minor)<5 & data$length<30]=="low",
+  r6= data$importance[data$deaths>=1 | (data$major+data$minor)>=10 | data$length>=60]=="high",
+  r7= data$importance[data$deaths==0 & (data$major+data$minor)<10 & data$length>=30 & data$length<60]=="medium",
+  r8=is.POSIXct(data$open),
+  r9=in_range(data$open,min="2013-01-01 00:00:00",max="2022-12-31 23:59:00"),
+  r10=is.POSIXct(data$close),
+  r11=in_range(data$close,min="2013-01-01 00:00:00",max="2023-01-01 23:59:00"),
+  r12=data$close > data$open,
+  r13=is.numeric(data$length),
+  r14=data$length>0,
+  r15=data$length == difftime(data$close,data$open,units = "mins"),
+  r16=is.factor(data$type),
+  r17=length(levels(data$type))<=length(structure.list),
+  r18=data$type %in% structure.list,
+  r19=is.factor(data$region),
+  r20=length(levels(data$region))<=length(region.list),
+  r21=data$region %in% region.list,
+  r22=is.factor(data$subregion),
+  r23=length(levels(data$subregion))<=length(subregion.list),
+  r24=data$subregion %in% subregion.list,
+  r25=is.factor(data$district),
+  r26=length(levels(data$district)) <= length(levels(as.factor(dist$NAME_1))),
+  r27=data$district %in% dist$NAME_1,
+  r28=listunmatch(dist.list,matchdist)==0,
+  r29=is.factor(data$municipality),
+  r30=length(levels(data$municipality)) <= length(levels(as.factor(conc$NAME_2))),  
+  r31=data$municipality %in% conc$NAME_2, 
+  r32=listunmatch(mun.list,matchmun)==0,
+  r33=is.factor(data$parish),
+  r34=length(levels(data$parish)) <= length(levels(as.factor(freg$NAME_3))),
+  r35=data$parish %in% freg$NAME_3,
+  r36=listunmatch(par.list,matchpar)==0,
+  r37=is.numeric(data$lat),
+  r38=in_range(data$lat, min=dist@bbox[2,1], max=dist@bbox[2,2]),
+  r39=is.numeric(data$lon),
+  r40=in_range(data$lon, min=dist@bbox[1,1], max=dist@bbox[1,2]),
+  r41=is.factor(data$pfd),
+  r42=is.numeric(data$groundhr),
+  r43=is.numeric(data$groundtr),
+  r44=is.numeric(data$airhr),
+  r45=is.numeric(data$airtr),
+  r46=is.numeric(data$deaths),
+  r47=is.numeric(data$major),
+  r48=is.numeric(data$minor),
+  r49=is.numeric(data$assist),
+  r50=is.numeric(data$other),
+  r51=is.numeric(data$apc),
+  r52=is.numeric(data$otherv),
+  r53=data$groundhr >= 0,
+  r54=data$groundtr >= 0,
+  r55=data$airhr >= 0,
+  r56=airtr >= 0,
+  r57=data$deaths >= 0,
+  r58=data$major >= 0,
+  r59=data$minor >= 0,
+  r60=data$assist >= 0,
+  r61=data$other >= 0,
+  r62=data$apc >= 0,
+  r63=data$otherv >= 0,
+  r64=(data$deaths+data$major+data$minor+data$assist+data$other)==(data$apc+data$otherv),
+  r65=is.factor(data$reignit),
+  r66=length(levels(data$reignit))==2,
+  r67=data$reignit %in% c("no","yes")
 )
+
+
+
+# is.in<-function(df){
+#   
+#   df=data
+#   
+#   secr::pointsInPolygon(xy = df[,c("lon","lat")],poly = poly(df$district))
+# }
+
+
+
 ```
 
 Validation results:
 ```{r}
 confront(data, rules)
 summary(confront(data, rules))[,-c(6:8)]
+
 ```
 
 
 
 # Data cleaning
+
+Dataset dimension: `r dim(data)[1]` rows and `r dim(data)[2]` columns
 
 ## Variable length 
 
@@ -419,7 +446,7 @@ for (i in 1:nrow(data)) {
 ```
 Number of errors: `r sum(dur-data$length,na.rm=T)`.
 
-As the raw fire length was given rounded to the largest integer not greater than the corresponding value, it was replaced by the true time difference:
+As the raw fire length was given rounded to the largest integer not greater than the corresponding value, this variable was replaced by the true time difference:
 
 ```{r}
 data$length<-dur
@@ -439,6 +466,8 @@ data = data %>%  filter(data$length>0)
 n3=dim(data);n3
 ```
 
+Number of objects with negative length: `r n2[1]-n3[1]`.
+
 At this step, the dataset included `r n3[1]` objects and `r n3[2]` variables.
 
 
@@ -449,6 +478,9 @@ The next chunk correctes variable importance according to definitions:
 ```{r}
 data = data %>%
   mutate(importance=factor(ifelse(data$deaths==0 & (data$major+data$minor)<5 & data$length<30,"low",ifelse(data$deaths>=1|(data$major+data$minor)>=10 | data$length>=60,"high","medium"))))
+
+# table(data$importance)
+
 ```
 
 ## Variables lon and lat
@@ -462,8 +494,30 @@ bound=dist[dist$NAME_0=="Portugal",]
 ## create spatial object from coordinates and data.frame
 spdf <- SpatialPointsDataFrame(coords = data[, c("lon", "lat")], data = data, proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
 
+pts<-data[is.na(over(spdf, as(bound, "SpatialPolygons"))),c("lon","lat")]
+```
+
+Number of points outside borders: `r nrow(pts)`
+
+Mapping the errors:
+
+```{r}
+map=dist[dist$NAME_0=="Portugal",]
+pts_sf <- st_as_sf(pts, coords = c("lon", "lat"), crs = 4326)
+tmap_options(check.and.fix = TRUE)
+tm_shape(map) + 
+  tm_borders() +
+  tm_text("NAME_1",size = 0.5, fontfamily="sans", ymod = 0.4)+
+  tm_shape(pts_sf) + tm_dots(size=0.1,shape=4,col="red")  
+```
+
+Correcting the data:
+
+```{r}
 data = data %>%  filter(!is.na(over(spdf, as(bound, "SpatialPolygons"))))
 ```
+
+
 
 ```{r,include=FALSE}
 n4=dim(data);n4
@@ -542,8 +596,6 @@ Number of districts with points falling outside administrative boundaries: `r nr
 Mapping the errors:
 
 ```{r}
-map=dist[dist$NAME_0=="Portugal",]
-
 tif_sf <- st_as_sf(df, coords = c("lon", "lat"), crs = 4326)
 tif_sf$new_dist_error=paste0("  ",rownames(tif_sf),".",tif_sf$dist_error)
 
@@ -667,7 +719,7 @@ coordinates(df)=~lon+lat
 proj4string(df) = proj4string(conc)
 correctmun<-over(df, conc)
 
-#corection
+#correction
 data$municipality<-factor(correctmun$NAME_2)
 
 ```
@@ -710,7 +762,7 @@ correctedp=length(clistoutp[which(unlist(lapply(X = clistoutp,FUN = is.data.fram
 correctedp
 ```
 
-Number of parishes with points falling outside administrative boundaries: `r correctedp` errors
+Number of parishes with points falling outside administrative boundaries: `r correctedp` errors, corresponding to `r round(correctedp/nrow(data)*100,4)` \%
 
 ```{r,results="hide"}
 #points outside boundaries
@@ -743,7 +795,7 @@ At this step, the dataset included `r n7[1]` objects and `r n7[2]` variables.
 
 
 
-# Structural validation 2
+# Checking validation rules
 
 ```{r}
 confront(data, rules)
@@ -758,10 +810,7 @@ n8=dim(data);n8
 
 The dataset included `r n8[1]` objects and `r n8[2]` variables.
 
-
-# Final dataset
-
-## Dataset size changes
+# Dataset size changes
 
 ```{r}
 size=as.data.frame(rbind(n1,n2,n3,n4,n5,n6,n7,n8))
@@ -776,28 +825,23 @@ size=as.data.frame(rbind(n1,n2,n3,n4,n5,n6,n7,n8))
     size$dif.vars[i]=size$V2[i-1]-size$V2[i]
     }
 
-rownames(size)=c("Start","Removal of variables","Negative length","Portuguese borders","District labels correction","Minicipality labels correction","Parish labels correction","Final")
+rownames(size)=c("Start","Removal of variables","Negative length","Portuguese borders","District labels correction","Municipality labels correction","Parish labels correction","Final")
 colnames(size)=c("n","p","delta.n","delta.p")
 
 size
 ```
 
-## Summary
+# Data summary
 
 ```{r}
 str(data)
 summary(data)
-
 ```
 
-## Save workspace
+# Save workspace
 
 ```{r}
-save.image("Raw2FinalEnv.RData")
+save.image("Workspaces/Env1.RData")
 ```
 
-## Save final data
 
-```{r}
-write_xlsx(data,col_names = TRUE,path = "finaldata.xlsx")
-```
