@@ -64,58 +64,16 @@ library(lubridate)
 library(validate)
 library(gridExtra)
 
-
-load('Raw2FinalEnv.RData')
+load('Env1.RData')
 ```
 
-# Data description
+
+# Content Validation
+
+## Intial summary statistics
 
 ```{r}
 summary(data)
-```
-
-## Variable length
-
-+ Minutes:
-
-```{r}
-summary(data$length)
-```
-
-+ Days:
-
-```{r}
-summary(data$length/(24*60))
-```
-
-+ Years:
-
-```{r}
-summary(data$length/(24*60*365))
-```
-
-The next chunk provides the variable empirical quantiles:
-
-```{r}
-qtab("length")
-```
-
-The next chunk excludes cases with a fire length above 510 minutes (0.99 quantile):
-
-```{r}
-data = data %>%
-  filter(data$length<=quantile(data$length,0.99))
-```
-
-Checking correction:
-
-```{r}
-summary(data$length)
-```
-
-
-```{r,include=FALSE}
-hist(data$length,probability=T,main=" ",xlab="Length of urban fires (in minutes)")
 ```
 
 
@@ -126,141 +84,57 @@ n9=dim(data);n9
 At this step, the dataset included `r n9[1]` objects and `r n9[2]` variables.
 
 
-## Variable other
+### Variable length
 
 ```{r}
-summary(data$other)
+summary(data$length)
 ```
 
-The next chunk excludes cases with this variable above .
+Removing incorrect lengths:
 
 ```{r}
-data = data %>%
-  filter(data$other<=quantile(data$other,0.99))
+assign("le", read_xlsx("LengthErrors.xlsx"))
+data[data$id %in% le$error,] %<>%
+  mutate(length = NA, close = NA)
 ```
 
 Checking correction:
 
 ```{r}
-summary(data$other)
+summary(data$length)
 ```
+
+### Resources
+
+Removing incorrect values:
+
+```{r}
+data[data$groundhr==0 & data$groundtr==0 & data$airhr==0 & data$airtr==0, ] %<>%
+  mutate(groundhr=NA, groundtr=NA, airhr=NA, airtr=NA)
+
+summary(data)
+
+```
+
 
 
 ```{r,include=FALSE}
 n10=dim(data);n10
-n9-n10
 ```
 
 At this step, the dataset included `r n10[1]` objects and `r n10[2]` variables.
 
 
-## Variable otherv
-
-```{r}
-summary(data$otherv)
-```
-
-The next chunk excludes cases with a fire length above 0.99 quantile:
-
-```{r}
-data = data %>%
-  filter(data$otherv<=3)
-```
-
-Cheching correction:
-
-```{r}
-summary(data$otherv)
-```
-
-```{r,include=FALSE}
-n11=dim(data);n11
-n10-n11
-```
-
-At this step, the dataset included `r n11[1]` objects and `r n11[2]` variables.
-
-
-# Updating and checking rules
-
-```{r}
-new.rules <- validator(
-  rule.id.1=is.numeric(data$id),
-  rule.id.2=is_unique(data$id),
-  rule.importance.1=is.factor(data$importance),
-  rule.importance.2=data$importance %in% c("low","median","high","unknown"),
-  rule.importance.cv.1= with(data,sum((deaths==0 & (major+minor)<5 & length<30)))==sum(data$importance=="low") ,
-  rule.importance.cv.2= with(data,sum((deaths>=1 | (major+minor)>=10 | length>=60)))==sum(data$importance=="high"),
-  rule.importance.cv.3= with(data,sum(deaths==0 & ((major+minor)>=5 & (major+minor)<10) | (length>=30 & length<60)&length<60))==sum(data$importance=="medium"),
-  rule.open.1=is.POSIXct(data$open),
-  rule.open.2=in_range(data$open,min="2013-01-01 00:00:00",max="2022-12-31 23:59:00"),
-  rule.close.1=is.POSIXct(data$close),
-  rule.close.2=in_range(data$close,min="2013-01-01 00:00:00",max="2023-01-01 23:59:00"),
-  rule.close.3=data$close > data$open,
-  rule.length.1=is.numeric(data$length),
-  rule.length.2=data$length == difftime(data$close,data$open,units = "mins"),
-  rule.length.cv=data$length<=501,
-  rule.type.1=is.factor(data$type),
-  rule.type.2=length(levels(data$type))==length(structure.list),
-  rule.type.3=data$type %in% structure.list,
-  rule.region.1=is.factor(data$region),
-  rule.region.2=length(levels(data$region))==length(region.list),
-  rule.region.3=data$region %in% region.list,
-  rule.subregion.1=is.factor(data$subregion),
-  rule.subregion.2=length(levels(data$subregion))==length(subregion.list),
-  rule.subregion.3=data$subregion %in% subregion.list,
-  rule.district.1=is.factor(data$district),
-  rule.district.2=length(levels(data$district)) <= length(levels(as.factor(dist$NAME_1))),
-  rule.district.3=data$district %in% dist$NAME_1,
-  rule.municipality.1=is.factor(data$municipality),
-  rule.municipality.2=length(levels(data$municipality)) <= length(levels(as.factor(conc$NAME_2))),  
-  rule.municipality.3=data$municipality %in% levels(as.factor(conc$NAME_2)),  
-  rule.parish.1=is.factor(data$parish),
-  rule.parish.2=length(levels(data$parish)) <= length(levels(as.factor(freg$NAME_3))),
-  rule.lat.1=is.numeric(data$lat),
-  rule.lat.2=in_range(data$lat, min=dist@bbox[2,1], max=dist@bbox[2,2]),
-  rule.lon.1=is.numeric(data$lon),
-  rule.lon.2=in_range(data$lon, min=dist@bbox[1,1], max=dist@bbox[1,2]),
-  rule.pfd.1=is.factor(data$pfd),
-  rule.groundhr.1=is.numeric(data$groundhr),
-  rule.groundhr.2=data$groundhr >= 0,
-  rule.groundtr.1=is.numeric(data$groundtr),
-  rule.groundtr.2=data$groundtr >= 0,
-  rule.airhr.1=is.numeric(data$airhr),
-  rule.airhr.2=data$airhr >= 0,
-  rule.airtr.1=is.numeric(data$airtr),
-  rule.airtr.2=airtr >= 0,
-  rule.deaths.1=is.numeric(data$deaths),
-  rule.deaths.2=data$deaths >= 0,
-  rule.major.1=is.numeric(data$major),
-  rule.major.2=data$major >= 0,
-  rule.minor.1=is.numeric(data$minor),
-  rule.minor.2=data$minor >= 0,
-  rule.assist.1=is.numeric(data$assist),
-  rule.assist.2=data$assist >= 0,
-  rule.other.1=is.numeric(data$other),
-  rule.other.2=data$other >= 0,
-  rule.other.cv=data$other <=3,
-  rule.anepcv.1=is.numeric(data$anepcv),
-  rule.anepcv.2=data$anepcv >= 0,
-  rule.otherv.1=is.numeric(data$otherv),
-  rule.otherv.2=data$otherv >= 0,
-  rule.otherv.cv=data$otherv <=3,
-  rule.reignit.1=is.factor(data$reignit),
-  rule.reignit.2=length(levels(data$reignit))==2,
-  rule.reignit.3=data$reignit %in% c("no","yes")
-)
-
-
-out=confront(data, new.rules)
-summary(out)[-c(6:8)]
-
-
-```
-
 ## Exploratory data analysis
 
-## Fire importance
+```{r}
+str(data)
+summary(data)
+```
+
+
+### Fire importance
+
 
 The next chunk gives the distribution of the fire importance (table and plot):
 
@@ -268,7 +142,7 @@ The next chunk gives the distribution of the fire importance (table and plot):
 ctab(var = importance)
 ```
 
-## Ignition date/time
+### Ignition date/time
 
 The next chunks gives the distribution of the events as a function of:
 
@@ -276,7 +150,10 @@ The next chunks gives the distribution of the events as a function of:
 + Year
 
 ```{r}
-ctab(var = format(open,format="%Y"))[[1]]
+ty<-ctab(var = format(open,format="%Y"))[[1]];ty
+min(ty$n)
+max(ty$n)
+mean(ty$n)
 ```
 
 
@@ -324,7 +201,7 @@ p1=ggplot(tab1, aes(x,Proportion)) +
   geom_bar(stat = "identity")+
   labs(x=" ",y="Frequency")+theme_bw()+
   geom_bar(stat="identity",color="black",fill="white")+  
-  geom_text(aes(label = paste0(sprintf("%4.1f", Proportion * 100), "%")),cex=3,vjust=2)+ ggtitle("(A)")
+  geom_text(aes(label = paste0(sprintf("%4.1f", Proportion * 100), "%")),cex=2.5,vjust=2)+ ggtitle("(A)")
 
 tab2=data %>%
   mutate(x=v2) %>%
@@ -335,7 +212,7 @@ p2=ggplot(tab2, aes(x,Proportion)) +
   geom_bar(stat = "identity")+
   labs(x=" ",y="Frequency")+theme_bw()+
   geom_bar(stat="identity",color="black",fill="white")+  
-  geom_text(aes(label = paste0(sprintf("%4.1f", Proportion * 100), "%")),cex=3,vjust=2)+ ggtitle("(B)")
+  geom_text(aes(label = paste0(sprintf("%4.1f", Proportion * 100), "%")),cex=2.5,vjust=2)+ ggtitle("(B)")
 
 tab3=data %>%
   mutate(x=v3) %>%
@@ -346,7 +223,8 @@ p3=ggplot(tab3, aes(x,Proportion)) +
   geom_bar(stat = "identity")+
   labs(x=" ",y="Frequency")+theme_bw()+
   geom_bar(stat="identity",color="black",fill="white")+  
-  geom_text(aes(label = paste0(sprintf("%4.1f", Proportion * 100), "%")),cex=3,vjust=2)+ ggtitle("(C)")
+  geom_text(aes(label = paste0(sprintf("%4.1f", Proportion * 100), "%")),cex=3,vjust=2)+ ggtitle("(C)")+
+  theme(axis.text.x = element_text(size = 6))
 
 tab4=data %>%
   mutate(x=v4) %>%
@@ -363,7 +241,7 @@ p4=ggplot(tab4, aes(x,Proportion)) +
 grid.arrange(p1,p2,p3,p4, nrow = 2)
 ```
 
-## Total counts per district
+### Total counts per district
 
 ```{r maps,fig.width=10,fig.height=5,warning=FALSE}
 #Fire data by district
@@ -405,11 +283,10 @@ tm_shape(mapadistfs)+
   tm_polygons("n", palette="Greens",breaks=bks,legend.show=FALSE,alpha = 0.1)+
   tm_text("n", size = 0.5, fontfamily="sans", ymod = -.1)
 
-
 tmap_arrange(p1,p2)
 ```
 
-## Variable type
+### Fire type
 
 
 ```{r}
@@ -424,7 +301,7 @@ ggplot(tab, aes(y = reorder(type, prop),x=prop)) +
   theme(plot.margin = unit(c(2,3,2,2), "cm"))+xlim(c(0,1))+ ggtitle("(A)")
 ```
 
-### Total counts per type (residential vs. not)
+The code below maps the total counts per type of fire (residential vs. not).
 
 ```{r maps1,fig.width=10,fig.height=5,warning=FALSE}
 #Residential
@@ -465,7 +342,9 @@ p4=tm_shape(mapadisttypeo)+
 tmap_arrange(p3,p4)
 ```
 
-## Frequency of fires per location
+
+
+### Frequency of fires per location
 
 The next chunk builds a dataframe quantifying the number of objects with exactly the same coordinates. 
 
@@ -491,18 +370,17 @@ rownames(ufreps)<-NULL
 This chunk presents an example:
 
 ```{r}
-ufreps[ufreps$District=="Coimbra"&ufreps$Year==2022,]
+ufreps[ufreps$District=="Braga"&ufreps$Year==2022,]
 
 ```
 
 
-In this example there were `r ufreps[ufreps$District=="Coimbra",][3,3]` locations for which only `r ufreps[ufreps$District=="Coimbra",][3,2]` event was registered.
+In this example there were `r ufreps[ufreps$District=="Braga",][3,3]` locations for which only `r ufreps[ufreps$District=="Braga",][3,2]` event was registered.
 
+The next chunk produces a bubble plot for each one of the districts (Braga), in which the size of the bubble is proportion to the num of fires within the same location.
 
-The next chunk adds a new variable (cty) to the dataset to distinguish this type of coordinates
-
-```{r}
-#spatial coordinates
+```{r,fig.width=18,fig.height=8}
+# Bubble plot
 crep=data.frame(data[,c("district","open","lon","lat")])
 crep2sp<-data.frame(data[,c("district","open","lon","lat")])
 crep2sp$year = as.numeric(format(data$open,format="%Y"))
@@ -513,19 +391,6 @@ list.d0=sapply(split(crep2sp, as.numeric(format(data$open,format="%Y"))), zerodi
 df.d0=as.data.frame(do.call(rbind, unname(Map(cbind, id = names(list.d0), list.d0))))
 colnames(df.d0)=c("year","v1","v2")
 
-v1<-vector()
-#new variable by year --- cty --- Coordinates TYpe
-for (i in 1:length(years)) {
-v0=ifelse(data$lon[format(data$open,format="%Y")==years[i]] %in% data$lon[as.numeric(df.d0[df.d0$year==years[i],2])],"not exact","exact")
-v1=c(v1,v0)
-}
-data$cty<-factor(v1)
-```
-
-The next chunk produces a bubble plot for each one of the districts, in which the size of the bubble is proportion to the num of fires within the same location.
-
-```{r,fig.width=18,fig.height=8}
-# Bubble plot
 crep$year<-format(crep$open,format="%Y")
 bubble=crep[crep$lon %in% crep[df.d0[,2],"lon"],] %>%
     arrange(district,year,lon) %>%
@@ -547,7 +412,7 @@ for (i in 1:length(unique(bubble$district))) {
 
 Example:
 
-```{r}
+```{r,fig.width=18,fig.height=8}
 i=3
 name=paste(unique(bubble$district)[i])
   print(tm_shape(freg[freg$NAME_1==name,]) + 
@@ -557,6 +422,65 @@ name=paste(unique(bubble$district)[i])
           tm_bubbles(size = "n", col="n",alpha=0.4, breaks=bks, legend.size.show = FALSE, title.col = "Frequency") + 
           tm_layout(main.title= " ", main.title.position = "center",main.title.size = 2,legend.text.size = 1, legend.title.size = 1.5,frame=FALSE))
 ```
+
+
+### Parish centroids
+
+The next chunk creates two spatial objects (class sf): (1) data_sf - containing all fire events and (2) cents_sf - containing all parish centroids.
+
+```{r}
+#dataset
+data_sf <- data[,c("district","municipality","parish","lon","lat")] %>%
+  st_as_sf(coords = c('lon', 'lat')) %>%
+  st_set_crs("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +units=km")
+
+#centroids
+cents<-data.frame(district=freg$NAME_1,municipality=freg$NAME_2,parish=freg$NAME_3,cent.x=NA,cent.y=NA)
+for (i in 1:nrow(cents)) {
+  cents[i,"cent.x"]<-gCentroid(freg[i,],byid=TRUE)@coords[1]
+  cents[i,"cent.y"]<-gCentroid(freg[i,],byid=TRUE)@coords[2]
+}
+cents_sf <- cents %>%
+   st_as_sf(coords = c('cent.x', 'cent.y')) %>%
+   st_set_crs("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +units=km")
+```
+
+
+The next chunk defines a buffer of 10 meters around each parish centroid.
+
+```{r}
+d<-0.01 #km
+cents_buff<-st_buffer(cents_sf, units::as_units(d, 'kilometer')) #10 metros
+```
+
+The next chunk creates a dataframe containing fire events, the respective parish centroids and the distance between the ignition point and the parish centriod. Points within the 10 meters buffer are idenfified.
+
+```{r,fig.width=15}
+#merge data
+data.cents<-merge(data[,c("district","municipality","parish","lon","lat")],cents,by.x=c("district","municipality","parish"),by.y=c("district","municipality","parish"))
+data.cents$dist<-pointDistance(data.cents[,c("lon","lat")], data.cents[,c("cent.x","cent.y")], lonlat=TRUE, allpairs=FALSE)/1000
+data.cents$buff<-ifelse(data.cents$dist<=d,1,0)
+```
+
+The code below produces a map with an example (Fafe parish, Braga district). Red points are within the buffer (in); blue points are outside the buffer (out).
+
+```{r,fig.width=15}
+FregPlot=freg[freg$NAME_3=="Fafe",]
+plot(FregPlot,main=paste("Fafe"),cex.main=1)
+plot(cents_buff[cents_buff$parish=="Fafe",],col="grey80",add=TRUE)
+points(cents$cent.x[cents$parish=="Fafe"],cents$cent.y[cents$parish=="Fafe"],col="black",pch=16,cex=0.5)
+points(data.cents[data.cents$parish=="Fafe",c("lon","lat")],pch=4,cex=0.8,col=ifelse(data.cents[data.cents$parish=="Fafe","buff"]==0,4,2),lwd=2)
+text(data.cents[data.cents$parish=="Fafe",c("lon","lat")],ifelse(data.cents[data.cents$parish=="Fafe","buff"]==0,"out","in"),col=ifelse(data.cents[data.cents$parish=="Fafe","buff"]==0,4,2),pos=4)
+```
+### Coordinates type
+
+The next chunk adds a new variable (cty - coordinates type) to the dataset to distinguish this type of coordinates (inside vs. outside buffer), i.e., exact vs. not exact (taken by the parish centroid).
+
+```{r}
+data$cty<-factor(data.cents$buff,labels = c("exact","not exact"))
+round(prop.table(table(data$cty))*100)
+```
+
 
 Variable distribution:
 ```{r}
@@ -574,16 +498,15 @@ data %>%
 
 
 
-## Administrative units
+### Administrative units
 
-#### District
+##### District
 
 ```{r}
 tab=data %>% 
   count(district, sort = TRUE) %>% 
   arrange(desc(n)) %>%
   mutate(prop=n/nrow(data)) %>% arrange(-prop)
-
 tab
 
 ggplot(tab, aes(y = reorder(district, prop),x=prop)) +
@@ -591,7 +514,7 @@ ggplot(tab, aes(y = reorder(district, prop),x=prop)) +
  theme(legend.position = "top")+theme_bw()
 ```
 
-#### Municipality
+##### Municipality
 
 ```{r}
 tab=data %>% 
@@ -602,38 +525,54 @@ tab=data %>%
 tab[tab$prop>0.01,]
 ```
 
+### Length
 
-## Resources
+```{r}
+summary(data$length)
+```
+```{r}
+qtab("length")
+```
 
-### Ground human resources
+
+### Resources
+
+#### Ground human resources
 
 ```{r}
 qtab(var = "groundhr")
 
-table(cut(data$groundhr,c(0,5,10,15,20,25,30,141)))
-prop.table(table(cut(data$groundhr,c(0,5,10,15,20,25,30,141))))*100
+table(cut(data$groundhr,c(0,5,10,15,20,25,30,141,257)))
+
+round(prop.table(table(cut(data$groundhr,c(0,5,10,15,20,25,30,141,257))))*100)
 
 ```
 
 
-### Ground tecnhical resources
+#### Ground tecnhical resources
 
 ```{r}
 qtab(var = "groundtr")
 
 plot(table(data$groundtr))
+
 table(cut(data$groundtr,c(0,1,3,5,7,9,11,49)))
-prop.table(table(cut(data$groundtr,c(0,1,3,5,7,9,11,49))))*100
+
+round(prop.table(table(cut(data$groundtr,c(0,1,3,5,7,9,11,49))))*100)
 
 ```
 
-### Air resources
+#### Air resources
 
 + human
 
 ```{r}
 table(data$airhr)
-round(prop.table(table(data$airhr)),3)
+round(round(prop.table(table(data$airhr))*100,3),1)
+
+round(cumsum(prop.table(table(data$airhr))*100),3)
+
+
 ```
 
 + technical
@@ -643,7 +582,7 @@ table(data$airtr)
 round(prop.table(table(data$airtr)),3)
 ```
 
-## Victims
+### Victims
 
 + major injuries
 
@@ -669,8 +608,105 @@ round(prop.table(table(data$deaths)),3)
 
 ```
 
-## Reignition
+### Reignition
 
 ```{r}
 ctab(var = reignit)
+```
+
+
+# Checking rules
+
+
+```{r}
+new.rules <- validator(
+   r1=is.numeric(data$id),
+  r2=is_unique(data$id),
+  r3=is.factor(data$importance),
+  r4=data$importance %in% c("low","medium","high","unknown"),
+  r5= data$importance[data$deaths==0 & (data$major+data$minor)<5 & data$length<30]=="low",
+  r6= data$importance[data$deaths>=1 | (data$major+data$minor)>=10 | data$length>=60]=="high",
+  r7= data$importance[data$deaths==0 & (data$major+data$minor)<10 & data$length>=30 & data$length<60]=="medium",
+  r8=is.POSIXct(data$open),
+  r9=in_range(data$open,min="2013-01-01 00:00:00",max="2022-12-31 23:59:00"),
+  r10=is.POSIXct(data$close),
+  r11=in_range(data$close,min="2013-01-01 00:00:00",max="2023-01-01 23:59:00"),
+  r12=data$close > data$open,
+  r13=is.numeric(data$length),
+  r14=data$length>0,
+  r15=data$length == difftime(data$close,data$open,units = "mins"),
+  r16=is.factor(data$type),
+  r17=length(levels(data$type))<=length(structure.list),
+  r18=data$type %in% structure.list,
+  r19=is.factor(data$region),
+  r20=length(levels(data$region))<=length(region.list),
+  r21=data$region %in% region.list,
+  r22=is.factor(data$subregion),
+  r23=length(levels(data$subregion))<=length(subregion.list),
+  r24=data$subregion %in% subregion.list,
+  r25=is.factor(data$district),
+  r26=length(levels(data$district)) <= length(levels(as.factor(dist$NAME_1))),
+  r27=data$district %in% dist$NAME_1,
+  r28=listunmatch(dist.list,matchdist)==0,
+  r29=is.factor(data$municipality),
+  r30=length(levels(data$municipality)) <= length(levels(as.factor(conc$NAME_2))),  
+  r31=data$municipality %in% conc$NAME_2, 
+  r32=listunmatch(mun.list,matchmun)==0,
+  r33=is.factor(data$parish),
+  r34=length(levels(data$parish)) <= length(levels(as.factor(freg$NAME_3))),
+  r35=data$parish %in% freg$NAME_3,
+  r36=listunmatch(par.list,matchpar)==0,
+  r37=is.numeric(data$lat),
+  r38=in_range(data$lat, min=dist@bbox[2,1], max=dist@bbox[2,2]),
+  r39=is.numeric(data$lon),
+  r40=in_range(data$lon, min=dist@bbox[1,1], max=dist@bbox[1,2]),
+  r41=is.factor(data$pfd),
+  r42=is.numeric(data$groundhr),
+  r43=is.numeric(data$groundtr),
+  r44=is.numeric(data$airhr),
+  r45=is.numeric(data$airtr),
+  r46=is.numeric(data$deaths),
+  r47=is.numeric(data$major),
+  r48=is.numeric(data$minor),
+  r49=is.numeric(data$assist),
+  r50=is.numeric(data$other),
+  r51=is.numeric(data$apc),
+  r52=is.numeric(data$otherv),
+  r53=data$groundhr >= 0,
+  r54=data$groundtr >= 0,
+  r55=data$airhr >= 0,
+  r56=airtr >= 0,
+  r57=data$deaths >= 0,
+  r58=data$major >= 0,
+  r59=data$minor >= 0,
+  r60=data$assist >= 0,
+  r61=data$other >= 0,
+  r62=data$apc >= 0,
+  r63=data$otherv >= 0,
+  r64=(data$deaths+data$major+data$minor+data$assist+data$other)==(data$apc+data$otherv),
+  r65=is.factor(data$reignit),
+  r66=length(levels(data$reignit))==2,
+  r67=data$reignit %in% c("no","yes"),
+r68=is.factor(data$cty),
+r69=data$cty %in% c("exact","not exact")
+)
+```
+
+
+```{r}
+out=confront(data, new.rules)
+summary(out)[-c(6:8)]
+```
+
+
+# Save final data
+
+
+```{r}
+str(data)
+summary(data)
+```
+
+```{r}
+write_xlsx(data,col_names = TRUE,path = "finaldata.xlsx")
 ```
