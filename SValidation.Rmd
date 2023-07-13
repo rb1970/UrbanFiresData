@@ -1,5 +1,5 @@
 ---
-title: "Portuguese urban fires between 2013 and 2022"
+title: "Urban Fires | Structural Validation"
 author: "Regina Bispo"
 date: "`r Sys.Date()`"
 output:
@@ -844,7 +844,7 @@ summary(data)
 # Save workspace
 
 ```{r}
-save.image("Workspaces/Env1.RData")
+save.image("Env1.RData")
 ```
 
 
